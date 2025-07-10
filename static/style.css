@@ -1,0 +1,20 @@
+body {
+    font-family: sans-serif;
+    background-color: #f4f4f4;
+    text-align: center;
+    padding-top: 100px;
+}
+
+.container {
+    background: white;
+    display: inline-block;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px gray;
+}
+
+input, button {
+    margin: 10px;
+    padding: 10px;
+    width: 200px;
+}
