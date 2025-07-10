@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from uuid import uuid4
 from fastapi.responses import JSONResponse
+from fastapi import WebSocket, WebSocketDisconnect
 
 
 app = FastAPI()
@@ -72,3 +73,39 @@ def camera_page(request: Request, partida_id: str):
         "request": request,
         "partida_id": partida_id
     })
+
+#Página modo espectador
+@app.get("/espectador/{partida_id}", response_class=HTMLResponse)
+def espectador_page(request: Request, partida_id: str):
+    user = request.session.get("user")
+    if not user:
+        return RedirectResponse("/", status_code=302)
+
+    return templates.TemplateResponse("espectador.html", {
+        "request": request,
+        "partida_id": partida_id,
+        "user": user
+    })
+
+
+# Mapeamento de conexões por partida
+connections: dict[str, list[WebSocket]] = {}
+
+@app.websocket("/ws/{partida_id}")
+async def websocket_endpoint(websocket: WebSocket, partida_id: str):
+    await websocket.accept()
+
+    if partida_id not in connections:
+        connections[partida_id] = []
+
+    connections[partida_id].append(websocket)
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Encaminha para todos os outros usuários da partida
+            for conn in connections[partida_id]:
+                if conn != websocket:
+                    await conn.send_text(data)
+    except WebSocketDisconnect:
+        connections[partida_id].remove(websocket)

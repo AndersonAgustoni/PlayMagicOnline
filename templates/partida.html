@@ -3,11 +3,42 @@
 <head>
     <title>Partida {{ partida_id }}</title>
     <script>
+        let socket = null;
+        let peerConnection = null;
+    
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById("videoPreview").srcObject = stream;
+    
+                // Cria PeerConnection
+                peerConnection = new RTCPeerConnection();
+                stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+    
+                // Envia candidatos ICE
+                peerConnection.onicecandidate = event => {
+                    if (event.candidate) {
+                        socket.send(JSON.stringify({ type: "ice-candidate", candidate: event.candidate }));
+                    }
+                };
+    
+                // Cria oferta para o espectador
+                peerConnection.onnegotiationneeded = async () => {
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    socket.send(JSON.stringify({ type: "offer", offer: offer }));
+                };
+    
+            } catch (err) {
+                alert("Erro ao acessar a câmera: " + err.message);
+            }
+        }
+    
         function toggleCameraSource() {
             const usarCelular = document.getElementById("usarCelular").checked;
             const linkCelular = document.getElementById("linkCelular");
             const preview = document.getElementById("preview");
-
+    
             if (usarCelular) {
                 linkCelular.style.display = "block";
                 preview.style.display = "none";
@@ -17,20 +48,27 @@
                 startCamera();
             }
         }
-
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById("videoPreview").srcObject = stream;
-            } catch (err) {
-                alert("Erro ao acessar câmera/microfone: " + err.message);
-            }
-        }
-
+    
         window.onload = () => {
-            toggleCameraSource(); // Inicia preview se necessário
-        }
-    </script>
+            socket = new WebSocket(`ws://${location.host}/ws/{{ partida_id }}`);
+            socket.onmessage = async (event) => {
+                const msg = JSON.parse(event.data);
+    
+                if (msg.type === "answer") {
+                    const remoteDesc = new RTCSessionDescription(msg.answer);
+                    await peerConnection.setRemoteDescription(remoteDesc);
+                } else if (msg.type === "ice-candidate" && peerConnection) {
+                    try {
+                        await peerConnection.addIceCandidate(msg.candidate);
+                    } catch (e) {
+                        console.error('Erro ao adicionar ICE candidate', e);
+                    }
+                }
+            };
+    
+            toggleCameraSource();
+        };
+    </script>    
 </head>
 <body>
     <h2>Partida: {{ partida_id }}</h2>

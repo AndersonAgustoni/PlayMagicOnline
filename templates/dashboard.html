@@ -1,15 +1,33 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Dashboard</title>
     <link href="/static/style.css" rel="stylesheet">
 </head>
+
 <body>
     <div class="container">
         <h2>Bem-vindo, {{ user }}!</h2>
         <button onclick="window.location.href='/criar'">Criar Partida</button>
-        <button onclick="window.location.href='/acessar'">Acessar Partida Criada</button>
-        <button onclick="window.location.href='/espectador'">Espectador de Partida</button>
+        <button onclick="acessarPartida()">Acessar Partida Criada</button>
+        <button onclick="entrarComoEspectador()">Espectador de Partida</button>
     </div>
+    <script>
+        function acessarPartida() {
+            const partidaId = prompt("Digite o ID da partida:");
+            if (partidaId) {
+                window.location.href = `/partida/${partidaId}`;
+            }
+        }
+        
+        function entrarComoEspectador() {
+            const partidaId = prompt("Digite o ID da partida que deseja assistir:");
+            if (partidaId) {
+                window.location.href = `/espectador/${partidaId}`;
+            }
+        }
+    </script>
 </body>
+
 </html>

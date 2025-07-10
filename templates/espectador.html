@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Espectador da Partida {{ partida_id }}</title>
+</head>
+<body>
+    <h2>Espectando a Partida: {{ partida_id }}</h2>
+    <p>Bem-vindo, {{ user }} (modo espectador)</p>
+
+    <video id="videoEspectador" autoplay playsinline width="400" controls muted></video>
+
+    <script>
+        let socket = null;
+        let peerConnection = null;
+    
+        const video = document.getElementById("videoEspectador");
+    
+        window.onload = () => {
+            socket = new WebSocket(`ws://${location.host}/ws/{{ partida_id }}`);
+            peerConnection = new RTCPeerConnection();
+    
+            peerConnection.ontrack = (event) => {
+                video.srcObject = event.streams[0];
+            };
+    
+            peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    socket.send(JSON.stringify({ type: "ice-candidate", candidate: event.candidate }));
+                }
+            };
+    
+            socket.onmessage = async (event) => {
+                const msg = JSON.parse(event.data);
+    
+                if (msg.type === "offer") {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.offer));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    socket.send(JSON.stringify({ type: "answer", answer: answer }));
+                } else if (msg.type === "ice-candidate") {
+                    try {
+                        await peerConnection.addIceCandidate(msg.candidate);
+                    } catch (e) {
+                        console.error('Erro ao adicionar ICE candidate', e);
+                    }
+                }
+            };
+        };
+    </script>    
+</body>
+</html>
