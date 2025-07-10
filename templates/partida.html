@@ -1,44 +1,50 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Partida {{ partida_id }}</title>
     <script>
         let socket = null;
         let peerConnection = null;
-    
+
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById("videoPreview").srcObject = stream;
-    
+
                 // Cria PeerConnection
-                peerConnection = new RTCPeerConnection();
+                const peerConnection = new RTCPeerConnection({
+                    iceServers: [
+                        { urls: "stun:stun.l.google.com:19302" }
+                    ]
+                });
+
                 stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-    
+
                 // Envia candidatos ICE
                 peerConnection.onicecandidate = event => {
                     if (event.candidate) {
                         socket.send(JSON.stringify({ type: "ice-candidate", candidate: event.candidate }));
                     }
                 };
-    
+
                 // Cria oferta para o espectador
                 peerConnection.onnegotiationneeded = async () => {
                     const offer = await peerConnection.createOffer();
                     await peerConnection.setLocalDescription(offer);
                     socket.send(JSON.stringify({ type: "offer", offer: offer }));
                 };
-    
+
             } catch (err) {
                 alert("Erro ao acessar a câmera: " + err.message);
             }
         }
-    
+
         function toggleCameraSource() {
             const usarCelular = document.getElementById("usarCelular").checked;
             const linkCelular = document.getElementById("linkCelular");
             const preview = document.getElementById("preview");
-    
+
             if (usarCelular) {
                 linkCelular.style.display = "block";
                 preview.style.display = "none";
@@ -48,12 +54,30 @@
                 startCamera();
             }
         }
-    
+
+        function passarTurno() {
+            socket.send(JSON.stringify({
+                type: "passar-turno"
+            }));
+        }
+
         window.onload = () => {
             socket = new WebSocket(`ws://${location.host}/ws/{{ partida_id }}`);
+            socket.onopen = () => {
+                socket.send(JSON.stringify({
+                    type: "join",
+                    nickname: "{{ user }}"
+                }));
+            };
+
             socket.onmessage = async (event) => {
                 const msg = JSON.parse(event.data);
-    
+
+                if (msg.type === "participants") {
+                    document.getElementById("listaParticipantes").innerHTML =
+                        "<b>Participantes:</b> " + msg.users.join(", ");
+                }
+
                 if (msg.type === "answer") {
                     const remoteDesc = new RTCSessionDescription(msg.answer);
                     await peerConnection.setRemoteDescription(remoteDesc);
@@ -64,25 +88,56 @@
                         console.error('Erro ao adicionar ICE candidate', e);
                     }
                 }
+
+                if (msg.type === "estado") {
+                    const estado = msg.estado;
+                    document.getElementById("infoTurno").innerText = "Turno: " + estado.turno;
+                    document.getElementById("jogadorDaVez").innerText = "Jogador da vez: " + estado.jogador_da_vez;
+
+                    const vidasDiv = document.getElementById("vidas");
+                    vidasDiv.innerHTML = "";
+                    for (const nick in estado.vida) {
+                        vidasDiv.innerHTML += `<p>${nick}: ❤️ ${estado.vida[nick]}</p>`;
+                    }
+
+                    // Só mostra o botão se for sua vez
+                    if (estado.jogador_da_vez === "{{ user }}") {
+                        document.getElementById("passarTurno").style.display = "inline-block";
+                    } else {
+                        document.getElementById("passarTurno").style.display = "none";
+                    }
+                }
             };
-    
+
             toggleCameraSource();
         };
-    </script>    
+    </script>
 </head>
+
 <body>
     <h2>Partida: {{ partida_id }}</h2>
     <p>Jogador: {{ user }}</p>
-    <label>
-        <input type="checkbox" id="usarCelular" onchange="toggleCameraSource()"> Usar câmera do celular
-    </label>
+    <div id="listaParticipantes"></div>
 
-    <div id="linkCelular" style="display:none; margin-top:10px;">
-        <p>Abra no celular: <a href="/camera/{{ partida_id }}" target="_blank">/camera/{{ partida_id }}</a></p>
+    <div class="mesa">
+        <div class="slot" id="player-top">Topo (Adversário)</div>
+        <div class="slot" id="player-left">Esquerda</div>
+        <div class="campo-central">
+            <div id="area-cartas">Campo de Batalha</div>
+        </div>
+        <div class="slot" id="player-right">Direita</div>
+        <div class="slot" id="player-bottom">Você</div>
     </div>
 
-    <div id="preview" style="margin-top:20px;">
-        <video id="videoPreview" autoplay playsinline width="400"></video>
+    <div id="painel-estado" style="margin-top: 30px; padding: 10px; border: 1px solid #888;">
+        <h3>Estado do Jogo</h3>
+        <div id="infoTurno">Turno: -</div>
+        <div id="jogadorDaVez">Jogador da vez: -</div>
+        <div id="vidas"></div>
+        <button id="passarTurno" onclick="passarTurno()">Passar Turno</button>
     </div>
+
+    <video id="videoPreview" autoplay muted playsinline width="200" style="display:none;"></video>
 </body>
+
 </html>
