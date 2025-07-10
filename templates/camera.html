@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Câmera do Celular</title>
+</head>
+<body>
+    <h3>Transmitindo câmera do celular para a partida {{ partida_id }}</h3>
+    <video id="video" autoplay playsinline width="100%"></video>
+
+    <script>
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                document.getElementById("video").srcObject = stream;
+            } catch (err) {
+                alert("Erro ao acessar câmera: " + err.message);
+            }
+        }
+
+        startCamera();
+    </script>
+</body>
+</html>

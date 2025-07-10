@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Partida {{ partida_id }}</title>
+    <script>
+        function toggleCameraSource() {
+            const usarCelular = document.getElementById("usarCelular").checked;
+            const linkCelular = document.getElementById("linkCelular");
+            const preview = document.getElementById("preview");
+
+            if (usarCelular) {
+                linkCelular.style.display = "block";
+                preview.style.display = "none";
+            } else {
+                linkCelular.style.display = "none";
+                preview.style.display = "block";
+                startCamera();
+            }
+        }
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById("videoPreview").srcObject = stream;
+            } catch (err) {
+                alert("Erro ao acessar câmera/microfone: " + err.message);
+            }
+        }
+
+        window.onload = () => {
+            toggleCameraSource(); // Inicia preview se necessário
+        }
+    </script>
+</head>
+<body>
+    <h2>Partida: {{ partida_id }}</h2>
+    <p>Jogador: {{ user }}</p>
+    <label>
+        <input type="checkbox" id="usarCelular" onchange="toggleCameraSource()"> Usar câmera do celular
+    </label>
+
+    <div id="linkCelular" style="display:none; margin-top:10px;">
+        <p>Abra no celular: <a href="/camera/{{ partida_id }}" target="_blank">/camera/{{ partida_id }}</a></p>
+    </div>
+
+    <div id="preview" style="margin-top:20px;">
+        <video id="videoPreview" autoplay playsinline width="400"></video>
+    </div>
+</body>
+</html>
